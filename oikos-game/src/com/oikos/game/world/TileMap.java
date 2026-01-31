@@ -9,7 +9,7 @@ import java.awt.Graphics2D;
 import java.awt.Color;
 
 /**
- * TileMap avec support de l'auto-tiling pour les bordures.
+ * TileMap avec support de l'auto-tiling et du zoom.
  */
 public class TileMap {
 
@@ -37,13 +37,9 @@ public class TileMap {
         this.isNight = false;
         this.seed = System.currentTimeMillis();
 
-        // Initialiser l'auto-tile manager avec le chemin de tes assets
-        this.autoTiles = new AutoTileManager(assets, "/environment/decors");
+        this.autoTiles = new AutoTileManager(assets, "/environment");
     }
 
-    /**
-     * Génère une nouvelle map.
-     */
     public void generate(int width, int height, long seed) {
         this.seed = seed;
         this.mapWidth = width;
@@ -51,15 +47,12 @@ public class TileMap {
 
         System.out.println("[TileMap] Génération : " + width + "x" + height + " (seed: " + seed + ")");
 
-        // Charger les tiles AVANT de générer
         autoTiles.loadAllTiles();
         loadExtraSprites();
 
-        // Générer la map
         OikosMapGenerator generator = new OikosMapGenerator(seed);
         tileData = generator.generateWithRiver(width, height);
 
-        // Convertir en TileTypes
         tileTypes = new TileType[width][height];
         for (int x = 0; x < width; x++) {
             for (int y = 0; y < height; y++) {
@@ -74,56 +67,80 @@ public class TileMap {
         generate(width, height, System.currentTimeMillis());
     }
 
-    /**
-     * Charge les sprites supplémentaires (forêt, sable, chemin).
-     * À adapter selon tes fichiers existants.
-     */
     private void loadExtraSprites() {
-        // Si tu as ces fichiers, décommente et adapte les chemins :
-        // assets.loadSprite("forest_day", "/environment/decors/jour/tree.png", true);
-        // assets.loadSprite("forest_night", "/environment/decors/nuit/treeN.png", true);
-        // assets.loadSprite("sand_day", "/environment/decors/jour/sand.png", false);
-        // assets.loadSprite("sand_night", "/environment/decors/nuit/sandN.png", false);
-        // assets.loadSprite("path_day", "/environment/decors/jour/path.png", false);
-        // assets.loadSprite("path_night", "/environment/decors/nuit/pathN.png", false);
+        // À compléter selon tes assets
     }
 
     /**
-     * Dessine la map avec auto-tiling.
+     * Dessine la map avec support du zoom.
      */
     public void draw(Graphics2D g2, Camera camera) {
         if (tileData == null) return;
 
-        int startCol = Math.max(0, camera.getOffsetX() / tileSize - 1);
-        int endCol = Math.min(mapWidth, (camera.getOffsetX() + viewportWidth) / tileSize + 2);
-        int startRow = Math.max(0, camera.getOffsetY() / tileSize - 1);
-        int endRow = Math.min(mapHeight, (camera.getOffsetY() + viewportHeight) / tileSize + 2);
+        float zoom = camera.getZoom();
+        int scaledTileSize = (int) (tileSize * zoom);
+
+        // Si les tiles sont trop petites, ne pas les dessiner individuellement
+        if (scaledTileSize < 2) {
+            drawMinimap(g2, camera);
+            return;
+        }
+
+        // Calculer les tiles visibles (avec zoom)
+        float effectiveViewWidth = viewportWidth / zoom;
+        float effectiveViewHeight = viewportHeight / zoom;
+
+        int startCol = Math.max(0, (int)(camera.getOffsetX() / tileSize) - 1);
+        int endCol = Math.min(mapWidth, (int)((camera.getOffsetX() + effectiveViewWidth) / tileSize) + 2);
+        int startRow = Math.max(0, (int)(camera.getOffsetY() / tileSize) - 1);
+        int endRow = Math.min(mapHeight, (int)((camera.getOffsetY() + effectiveViewHeight) / tileSize) + 2);
 
         for (int y = startRow; y < endRow; y++) {
             for (int x = startCol; x < endCol; x++) {
                 TileType type = tileTypes[x][y];
 
-                int screenX = x * tileSize - camera.getOffsetX();
-                int screenY = y * tileSize - camera.getOffsetY();
+                // Position à l'écran avec zoom
+                int screenX = camera.worldToScreenX(x * tileSize);
+                int screenY = camera.worldToScreenY(y * tileSize);
 
-                // Choisir le sprite selon le type
+                // Taille avec zoom
+                int drawSize = camera.scaleToScreen(tileSize);
+
+                // Choisir le sprite
                 String spriteKey = getSpriteKey(x, y, type);
                 Sprite sprite = assets.getSprite(spriteKey);
 
                 if (sprite != null && sprite.image != null) {
-                    g2.drawImage(sprite.image, screenX, screenY, tileSize, tileSize, null);
+                    g2.drawImage(sprite.image, screenX, screenY, drawSize, drawSize, null);
                 } else {
                     // Fallback couleur
                     g2.setColor(getFallbackColor(type));
-                    g2.fillRect(screenX, screenY, tileSize, tileSize);
+                    g2.fillRect(screenX, screenY, drawSize, drawSize);
                 }
             }
         }
     }
 
     /**
-     * Détermine la clé du sprite à utiliser (avec auto-tiling).
+     * Dessine une minimap quand le zoom est très petit.
      */
+    private void drawMinimap(Graphics2D g2, Camera camera) {
+        float zoom = camera.getZoom();
+
+        for (int y = 0; y < mapHeight; y++) {
+            for (int x = 0; x < mapWidth; x++) {
+                TileType type = tileTypes[x][y];
+
+                int screenX = (int) ((x * tileSize - camera.getOffsetX()) * zoom);
+                int screenY = (int) ((y * tileSize - camera.getOffsetY()) * zoom);
+                int drawSize = Math.max(1, (int) (tileSize * zoom));
+
+                g2.setColor(getFallbackColor(type));
+                g2.fillRect(screenX, screenY, drawSize, drawSize);
+            }
+        }
+    }
+
     private String getSpriteKey(int x, int y, TileType type) {
         if (type == TileType.WATER) {
             boolean[] neighbors = getNeighborsOfType(x, y, TileType.WATER);
@@ -135,20 +152,15 @@ public class TileMap {
             return autoTiles.getRockSpriteKey(neighbors, isNight);
         }
 
-        // Types simples (sans auto-tiling)
         return autoTiles.getSimpleSpriteKey(type, isNight);
     }
 
-    /**
-     * Vérifie les 4 voisins d'une tile.
-     * @return [haut, droite, bas, gauche] - true si même type
-     */
     private boolean[] getNeighborsOfType(int x, int y, TileType type) {
         return new boolean[] {
-                getTileAt(x, y - 1) == type,  // Haut
-                getTileAt(x + 1, y) == type,  // Droite
-                getTileAt(x, y + 1) == type,  // Bas
-                getTileAt(x - 1, y) == type   // Gauche
+                getTileAt(x, y - 1) == type,
+                getTileAt(x + 1, y) == type,
+                getTileAt(x, y + 1) == type,
+                getTileAt(x - 1, y) == type
         };
     }
 
@@ -164,7 +176,7 @@ public class TileMap {
         }
     }
 
-    // --- Collision & Getters (inchangés) ---
+    // --- Collision & Getters ---
 
     public boolean[][] generateCollisionMap() {
         if (tileTypes == null) return null;

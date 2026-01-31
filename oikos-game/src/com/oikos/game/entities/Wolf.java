@@ -1,75 +1,35 @@
+package com.oikos.game.entities;
+
+import com.oikos.engine.core.GameObject;
 import java.awt.Graphics2D;
-import java.awt.Image;
-import javax.imageio.ImageIO;
-import java.io.File;
+import java.awt.Color;
 
-public class Loup extends Animaux 
-{
-    
-    Image   loup_droit, loup_gauche;
+/**
+ * Loup - Prédateur de l'écosystème.
+ * TODO: Implémenter la logique de chasse.
+ */
+public class Wolf extends GameObject {
 
-    public Loup(GameLoop _world) {
-        super(_world);
+    private float speed = 2f;
+    private int health = 100;
 
-        // zone de collision avec les objets de l'environnement
-        zoneSolide.x = 12;
-        zoneSolide.y = 9;
-        zoneSolide.width = 17;
-        zoneSolide.height = 13; 
-
-        loupImage();
+    public Wolf(float x, float y) {
+        super(x, y, 64, 64);
     }
 
-    public void loupImage()
-    {
-        try 
-        {
-            loup_gauche = ImageIO.read(new File("personnage/animaux/loup_gauche.png"));
-            loup_droit = ImageIO.read(new File("personnage/animaux/loup_droit.png"));
-        } 
-        catch ( Exception e) {
-            e.printStackTrace();
-            System.exit(-1);
-        }
+    @Override
+    public void update() {
+        // TODO: IA du loup (chasser les moutons)
     }
 
-    public void display(Graphics2D g2)
-    {
-        Image image = null;
-        switch( _orient )
-        {
-            case 0: //dos
-                image = loup_droit;
-                break;
-            case 1: //droit
-                image = loup_droit;
-                break;
-            case 2: //face
-                image = loup_gauche;
-                break;
-            case 3: //gauche
-                image = loup_gauche;
-                break;
+    @Override
+    public void draw(Graphics2D g2) {
+        // Dessin temporaire (carré gris)
+        if (image != null) {
+            super.draw(g2);
+        } else {
+            g2.setColor(new Color(100, 100, 100));
+            g2.fillRect((int)position.x, (int)position.y, width, height);
         }
-        g2.drawImage(image, posx, posy, _world.sizeImage, _world.sizeImage, null);
     }
-    
-    public void step() 
-    {
-        jourAvantAnniversaire++;
-        
-        if ( Math.random() > 0.5 ){  
-            _orient = (_orient+1) %4;
-        }
-        else if ( Math.random() <= 0.5 ){
-            _orient = (_orient-1+4) %4;
-        }
-        
-        collisionON = false;
-        _world.colTesteur.verificationImage(this); // on verifie les collisions
-
-        step_deplacement_alea();
-    }
-
-        //chercher mouton
 }

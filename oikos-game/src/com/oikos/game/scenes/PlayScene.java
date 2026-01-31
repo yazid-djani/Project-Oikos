@@ -27,17 +27,14 @@ public class PlayScene extends Scene {
     private float playerSpeed = 4f;
 
     // Map générée
-    private static final int MAP_WIDTH = 48;   // 3x plus large
-    private static final int MAP_HEIGHT = 36;  // 3x plus haut
+    private static final int MAP_WIDTH = 48;
+    private static final int MAP_HEIGHT = 36;
 
     public PlayScene(GameLoop gp) {
         super(gp);
         initializeGame();
     }
 
-    /**
-     * Constructeur avec seed spécifique.
-     */
     public PlayScene(GameLoop gp, long seed) {
         super(gp);
         initializeGame(seed);
@@ -51,7 +48,7 @@ public class PlayScene extends Scene {
         // AssetManager
         assets = new AssetManager(getClass());
 
-        // TileMap avec génération automatique
+        // TileMap
         tileMap = new TileMap(assets, gp.tileSize, gp.screenWidth, gp.screenHeight);
         tileMap.generate(MAP_WIDTH, MAP_HEIGHT, seed);
 
@@ -67,7 +64,7 @@ public class PlayScene extends Scene {
         collisionSystem = new CollisionSystem(gp.tileSize);
         tileMap.applyToCollisionSystem(collisionSystem);
 
-        // Trouver un point de spawn valide
+        // Spawn
         float[] spawn = tileMap.findSpawnPoint();
         playerX = spawn[0];
         playerY = spawn[1];
@@ -77,6 +74,8 @@ public class PlayScene extends Scene {
 
     @Override
     public void update() {
+        // === CONTRÔLES ===
+
         // ECHAP = menu
         if (gp.inputH.isKeyPressed(KeyEvent.VK_ESCAPE)) {
             gp.currentScene = new MenuScene(gp);
@@ -85,8 +84,8 @@ public class PlayScene extends Scene {
 
         // R = régénérer la map
         if (gp.inputH.isKeyPressed(KeyEvent.VK_R)) {
-            System.out.println("[PlayScene] Régénération de la map...");
-            initializeGame(); // Nouvelle seed
+            System.out.println("[PlayScene] Régénération...");
+            initializeGame();
             return;
         }
 
@@ -95,36 +94,58 @@ public class PlayScene extends Scene {
             tileMap.setNight(!tileMap.isNight());
         }
 
-        // Déplacement
-        float dx = 0, dy = 0;
+        // === ZOOM ===
 
-        if (gp.inputH.isUp()) dy -= playerSpeed;
-        if (gp.inputH.isDown()) dy += playerSpeed;
-        if (gp.inputH.isLeft()) dx -= playerSpeed;
-        if (gp.inputH.isRight()) dx += playerSpeed;
-
-        // Normaliser diagonale
-        if (dx != 0 && dy != 0) {
-            dx *= 0.707f;
-            dy *= 0.707f;
+        // M = voir toute la map (toggle)
+        if (gp.inputH.isKeyPressed(KeyEvent.VK_M)) {
+            camera.toggleFullMapView();
         }
 
-        // Vérifier collisions séparément pour glisser le long des murs
-        float newX = playerX + dx;
-        float newY = playerY + dy;
-
-        // Limites du monde
-        float halfTile = gp.tileSize / 2f;
-        newX = Math.max(halfTile, Math.min(newX, tileMap.getWorldPixelWidth() - halfTile));
-        newY = Math.max(halfTile, Math.min(newY, tileMap.getWorldPixelHeight() - halfTile));
-
-        // Collision X
-        if (!tileMap.isSolidAtPixel(newX, playerY)) {
-            playerX = newX;
+        // + / = = zoom in
+        if (gp.inputH.isKeyPressed(KeyEvent.VK_EQUALS) || gp.inputH.isKeyPressed(KeyEvent.VK_ADD)) {
+            camera.zoomIn(0.2f);
         }
-        // Collision Y
-        if (!tileMap.isSolidAtPixel(playerX, newY)) {
-            playerY = newY;
+
+        // - = zoom out
+        if (gp.inputH.isKeyPressed(KeyEvent.VK_MINUS) || gp.inputH.isKeyPressed(KeyEvent.VK_SUBTRACT)) {
+            camera.zoomOut(0.2f);
+        }
+
+        // 0 = reset zoom
+        if (gp.inputH.isKeyPressed(KeyEvent.VK_0) || gp.inputH.isKeyPressed(KeyEvent.VK_NUMPAD0)) {
+            camera.setZoom(1.0f);
+            camera.setFullMapView(false);
+        }
+
+        // === DÉPLACEMENT (seulement si pas en vue globale) ===
+        if (!camera.isFullMapView()) {
+            float dx = 0, dy = 0;
+
+            if (gp.inputH.isUp()) dy -= playerSpeed;
+            if (gp.inputH.isDown()) dy += playerSpeed;
+            if (gp.inputH.isLeft()) dx -= playerSpeed;
+            if (gp.inputH.isRight()) dx += playerSpeed;
+
+            // Normaliser diagonale
+            if (dx != 0 && dy != 0) {
+                dx *= 0.707f;
+                dy *= 0.707f;
+            }
+
+            // Collision
+            float newX = playerX + dx;
+            float newY = playerY + dy;
+
+            float halfTile = gp.tileSize / 2f;
+            newX = Math.max(halfTile, Math.min(newX, tileMap.getWorldPixelWidth() - halfTile));
+            newY = Math.max(halfTile, Math.min(newY, tileMap.getWorldPixelHeight() - halfTile));
+
+            if (!tileMap.isSolidAtPixel(newX, playerY)) {
+                playerX = newX;
+            }
+            if (!tileMap.isSolidAtPixel(playerX, newY)) {
+                playerY = newY;
+            }
         }
 
         // Caméra suit le joueur
@@ -137,32 +158,73 @@ public class PlayScene extends Scene {
         // 1. Map
         tileMap.draw(g2, camera);
 
-        // 2. Joueur (carré temporaire)
-        int screenX = camera.worldToScreenX(playerX) - gp.tileSize / 2;
-        int screenY = camera.worldToScreenY(playerY) - gp.tileSize / 2;
+        // 2. Joueur (seulement si visible)
+        if (!camera.isFullMapView() || camera.getZoom() > 0.1f) {
+            drawPlayer(g2);
+        }
+
+        // 3. Indicateur du joueur en vue globale
+        if (camera.isFullMapView()) {
+            drawPlayerIndicator(g2);
+        }
+
+        // 4. UI
+        drawUI(g2);
+    }
+
+    private void drawPlayer(Graphics2D g2) {
+        int size = camera.scaleToScreen(gp.tileSize);
+        int screenX = camera.worldToScreenX(playerX) - size / 2;
+        int screenY = camera.worldToScreenY(playerY) - size / 2;
 
         // Ombre
         g2.setColor(new Color(0, 0, 0, 80));
-        g2.fillOval(screenX + 4, screenY + gp.tileSize - 8, gp.tileSize - 8, 12);
+        g2.fillOval(screenX + size/8, screenY + size - size/6, size - size/4, size/6);
 
         // Corps
-        g2.setColor(new Color(70, 130, 180)); // Steel Blue
-        g2.fillRoundRect(screenX, screenY, gp.tileSize, gp.tileSize, 10, 10);
+        g2.setColor(new Color(70, 130, 180));
+        g2.fillRoundRect(screenX, screenY, size, size, size/6, size/6);
 
         // Contour
         g2.setColor(new Color(30, 80, 130));
-        g2.drawRoundRect(screenX, screenY, gp.tileSize, gp.tileSize, 10, 10);
+        g2.drawRoundRect(screenX, screenY, size, size, size/6, size/6);
+    }
 
-        // 3. UI
+    private void drawPlayerIndicator(Graphics2D g2) {
+        // Cercle rouge clignotant pour montrer où est le joueur
+        int screenX = camera.worldToScreenX(playerX);
+        int screenY = camera.worldToScreenY(playerY);
+
+        // Animation de pulsation
+        long time = System.currentTimeMillis();
+        int pulse = (int) (5 + 3 * Math.sin(time * 0.01));
+
+        g2.setColor(Color.RED);
+        g2.fillOval(screenX - pulse, screenY - pulse, pulse * 2, pulse * 2);
+
+        g2.setColor(Color.WHITE);
+        g2.drawOval(screenX - pulse - 2, screenY - pulse - 2, pulse * 2 + 4, pulse * 2 + 4);
+    }
+
+    private void drawUI(Graphics2D g2) {
         g2.setColor(Color.WHITE);
         g2.setFont(new Font("Arial", Font.BOLD, 14));
 
         int uiY = 20;
         g2.drawString("Seed: " + tileMap.getSeed(), 10, uiY);
         g2.drawString("Position: " + (int)playerX + ", " + (int)playerY, 10, uiY += 18);
+        g2.drawString("Zoom: " + String.format("%.1f", camera.getZoom()) + "x", 10, uiY += 18);
         g2.drawString("Mode: " + (tileMap.isNight() ? "Nuit" : "Jour"), 10, uiY += 18);
 
-        g2.setFont(new Font("Arial", Font.PLAIN, 12));
-        g2.drawString("[ZQSD] Déplacer | [N] Jour/Nuit | [R] Nouvelle map | [ECHAP] Menu", 10, gp.screenHeight - 10);
+        if (camera.isFullMapView()) {
+            g2.setColor(Color.YELLOW);
+            g2.drawString("📍 VUE GLOBALE", 10, uiY += 18);
+        }
+
+        // Aide en bas
+        g2.setColor(Color.WHITE);
+        g2.setFont(new Font("Arial", Font.PLAIN, 11));
+        String help = "[ZQSD] Déplacer | [M] Vue globale | [+/-] Zoom | [0] Reset | [N] Jour/Nuit | [R] Nouvelle map | [ESC] Menu";
+        g2.drawString(help, 10, gp.screenHeight - 10);
     }
 }
