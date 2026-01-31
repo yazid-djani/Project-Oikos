@@ -9,7 +9,7 @@ public class main
 		frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         frame.setResizable(false);
 
-        MinecosysPanel minecosys = new MinecosysPanel();
+        GameLoop minecosys = new GameLoop();
         
         System.out.println(minecosys.imaM.mapImageNum.length);
         System.out.println(minecosys.imaM.mapImageNum[0].length);

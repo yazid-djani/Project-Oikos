@@ -1,9 +1,9 @@
 
 public class CollisionManager
 {
-    MinecosysPanel _world;
+    GameLoop _world;
 
-    public CollisionManager ( MinecosysPanel _world )
+    public CollisionManager ( GameLoop _world )
     {
         this._world = _world;
     }

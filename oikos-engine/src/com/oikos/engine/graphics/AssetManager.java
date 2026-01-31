@@ -1,15 +1,14 @@
 import java.awt.Graphics2D;
 import javax.imageio.ImageIO;
-import java.awt.image.BufferedImage;
 import java.io.*;
 
 public class ImageManager
 {
     public int      mapImageNum[][];
     public Image[]  image;
-    MinecosysPanel  _world;
+    GameLoop _world;
 
-    public ImageManager(MinecosysPanel _world)
+    public ImageManager(GameLoop _world)
     {
         this._world = _world;
         

@@ -8,7 +8,7 @@ public class Loup extends Animaux
     
     Image   loup_droit, loup_gauche;
 
-    public Loup(MinecosysPanel _world) {
+    public Loup(GameLoop _world) {
         super(_world);
 
         // zone de collision avec les objets de l'environnement

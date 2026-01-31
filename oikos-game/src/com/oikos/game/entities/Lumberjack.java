@@ -17,7 +17,7 @@ public class Lumberjack extends Villageois
     Image   bucheron_dos_mov1, bucheron_dos_mov2;
     Image   bucheron_face_mov1, bucheron_face_mov2;
 
-    public Lumberjack(MinecosysPanel _world )
+    public Lumberjack(GameLoop _world )
     {
         super(_world);
         this.age  = (int)(Math.random()*(25 - 18 + 1) + 18);
@@ -29,7 +29,7 @@ public class Lumberjack extends Villageois
         bucheronImage();
     }
 
-    public Lumberjack(MinecosysPanel _world, int posx, int posy , int age)
+    public Lumberjack(GameLoop _world, int posx, int posy , int age)
     {
         super(_world);
         this.posx = posx;

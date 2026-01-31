@@ -1,6 +1,6 @@
 public class Mouton extends Animaux 
 {
-    public Mouton( MinecosysPanel world) {
+    public Mouton( GameLoop world) {
             super(world);
     }
 

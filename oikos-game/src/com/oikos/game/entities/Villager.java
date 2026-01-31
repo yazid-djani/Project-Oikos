@@ -5,14 +5,14 @@ public class Villager extends Agent
     public final int majorite   = 18;
     public final int max_proche = 5;
     
-    MinecosysPanel _world;
+    GameLoop _world;
     String  metier;
     String  sexe;
     boolean contaminer;
     int     niveau_faim;
     int     proche;
     
-    public Villager(MinecosysPanel _world )
+    public Villager(GameLoop _world )
     {
         this._world     = _world;
         this.contaminer = false;

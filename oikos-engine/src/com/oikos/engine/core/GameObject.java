@@ -1,56 +1,29 @@
-import java.awt.Rectangle;
+package com.oikos.engine.core;
 
-public abstract class GameObject
-{
-    MinecosysPanel _world;
-    public int     posx, posy;
-    public final int max_age    = 80;
-	boolean        alive;
-    int            age;
-    int            speed = 6;
-    int 	       _orient;
-    int            anniversaire = 50;
-    int            jourAvantAnniversaire = 0;
-    
-    //Pour les collisions
-    public Rectangle  zoneSolide;
-    boolean           collisionON = false;
+import com.oikos.engine.math.Vector2;
+import java.awt.Graphics2D;
+import java.awt.image.BufferedImage;
 
-    public GameObject()
-    {
-        _orient = 0;
-        alive   = true;
+public abstract class GameObject {
 
-        // zone de collision avec les objets de l'environnement
-        zoneSolide = new Rectangle(); // x,y,largueur, hauteur
-        zoneSolide.x = 10;
-        zoneSolide.y = 18;
-        zoneSolide.width = 11;
-        zoneSolide.height = 12; 
+    public Vector2 position;
+    public BufferedImage image; // L'image du perso
+    public int width, height;   // Taille
+
+    public GameObject(float x, float y, int width, int height) {
+        this.position = new Vector2(x, y);
+        this.width = width;
+        this.height = height;
     }
 
-    public void step_vieillir()
-    {
-        if ( age >= max_age )
-            mort();
-        else if (jourAvantAnniversaire == anniversaire) {
-            age++;
-            jourAvantAnniversaire = 0;
+    // Chaque objet devra définir comment il se met à jour (IA, mouvement)
+    public abstract void update();
+
+    // Chaque objet sait se dessiner
+    public void draw(Graphics2D g2) {
+        if (image != null) {
+            // On dessine l'image à la position X,Y (arrondie en entier pour l'écran)
+            g2.drawImage(image, (int)position.x, (int)position.y, width, height, null);
         }
     }
-
-    public int getX() {
-        return posx;
-    }
-
-    public int getY() {
-        return posy;
-    }
-
-    public void mort() {
-        alive = false;
-    }
-    
-    public abstract void step();
-
 }
