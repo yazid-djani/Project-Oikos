@@ -9,125 +9,124 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Gestionnaire centralisé des assets (images).
- * Supporte le chargement depuis le classpath ET le système de fichiers.
+ * Gestionnaire des assets avec recherche automatique.
+ * Cherche dans le classpath ET le système de fichiers.
  */
 public class AssetManager {
 
-    // Cache des sprites par clé
     private Map<String, Sprite> spriteCache;
-
-    // Classe de référence pour le chargement des ressources
     private Class<?> resourceClass;
-
-    // Chemin de base pour les ressources (système de fichiers)
-    private String basePath;
-
-    // Mode debug pour afficher les chemins testés
     private boolean debugMode = true;
+
+    // Chemins de base à essayer (système de fichiers)
+    private static final String[] BASE_PATHS = {
+            "oikos-game/resources/",
+            "resources/",
+            "../oikos-game/resources/",
+            "src/main/resources/",
+            "oikos-game/src/main/resources/",
+            ""
+    };
 
     public AssetManager(Class<?> resourceClass) {
         this.spriteCache = new HashMap<>();
         this.resourceClass = resourceClass;
-        this.basePath = findResourceBasePath();
 
         if (debugMode) {
             System.out.println("[AssetManager] Initialisé");
-            System.out.println("[AssetManager] Chemin de base détecté : " + basePath);
+            System.out.println("[AssetManager] Répertoire : " + new File("").getAbsolutePath());
         }
     }
 
     /**
-     * Trouve le chemin de base des ressources.
-     */
-    private String findResourceBasePath() {
-        // Liste des chemins possibles à tester
-        String[] possiblePaths = {
-                "oikos-game/resources",
-                "resources",
-                "../oikos-game/resources",
-                "src/main/resources",
-                "oikos-game/src/main/resources"
-        };
-
-        for (String path : possiblePaths) {
-            File dir = new File(path);
-            if (dir.exists() && dir.isDirectory()) {
-                return dir.getAbsolutePath();
-            }
-        }
-
-        // Par défaut, utiliser le répertoire courant
-        return new File("").getAbsolutePath();
-    }
-
-    /**
-     * Charge une image depuis le classpath ou le système de fichiers.
-     * @param key Identifiant unique (ex: "player_idle")
-     * @param path Chemin relatif (ex: "/environment/decors/jour/grass.png")
-     * @param solid Si true, l'objet bloque les collisions
-     * @return Le Sprite chargé, ou null si introuvable
+     * Charge un sprite en essayant plusieurs méthodes.
      */
     public Sprite loadSprite(String key, String path, boolean solid) {
-        // Si déjà en cache, on retourne directement
+        // Déjà en cache ?
         if (spriteCache.containsKey(key)) {
             return spriteCache.get(key);
         }
 
         BufferedImage image = null;
+        String foundPath = null;
 
-        // 1. Essayer depuis le classpath
+        // 1. Essayer le classpath
         image = loadFromClasspath(path);
+        if (image != null) foundPath = "classpath:" + path;
 
-        // 2. Si échoué, essayer depuis le système de fichiers
+        // 2. Essayer le système de fichiers
         if (image == null) {
-            image = loadFromFileSystem(path);
+            for (String basePath : BASE_PATHS) {
+                String fullPath = basePath + path;
+                image = loadFromFile(fullPath);
+                if (image != null) {
+                    foundPath = fullPath;
+                    break;
+                }
+            }
         }
 
-        // 3. Si toujours échoué, essayer avec des variantes de chemin
+        // 3. Essayer avec le chemin Windows (backslash)
         if (image == null) {
-            image = loadWithPathVariants(path);
+            String windowsPath = path.replace("/", "\\");
+            for (String basePath : BASE_PATHS) {
+                String fullPath = basePath.replace("/", "\\") + windowsPath;
+                image = loadFromFile(fullPath);
+                if (image != null) {
+                    foundPath = fullPath;
+                    break;
+                }
+            }
         }
 
+        // Succès ?
         if (image != null) {
             Sprite sprite = new Sprite(image, key, solid);
             spriteCache.put(key, sprite);
             if (debugMode) {
-                System.out.println("[AssetManager] ✓ Chargé : " + key);
+                System.out.println("[AssetManager] ✓ " + key + " <- " + foundPath);
             }
             return sprite;
         }
 
-        // Échec total
+        // Échec (pas d'erreur, on utilisera le fallback couleur)
         if (debugMode) {
-            System.err.println("[AssetManager] ✗ Introuvable : " + key + " (" + path + ")");
+            System.out.println("[AssetManager] ✗ " + key + " (introuvable: " + path + ")");
         }
         return null;
     }
 
     /**
-     * Charge depuis le classpath (resources dans le JAR ou le classpath).
+     * Charge depuis le classpath (pour les JAR).
      */
     private BufferedImage loadFromClasspath(String path) {
-        try {
-            // Essayer plusieurs formats de chemin
-            String[] pathsToTry = {
-                    path,
-                    path.startsWith("/") ? path : "/" + path,
-                    path.startsWith("/") ? path.substring(1) : path
-            };
+        // Variantes de chemin à essayer
+        String[] variants = {
+                "/" + path,
+                path,
+                "/resources/" + path,
+                "/" + path.replace("\\", "/")
+        };
 
-            for (String p : pathsToTry) {
+        for (String p : variants) {
+            try {
                 InputStream is = resourceClass.getResourceAsStream(p);
                 if (is != null) {
-                    if (debugMode) {
-                        System.out.println("[AssetManager] Trouvé dans classpath : " + p);
-                    }
                     return ImageIO.read(is);
                 }
+            } catch (IOException e) {
+                // Continuer
             }
-        } catch (IOException e) {
-            // Ignorer, on essaiera le système de fichiers
+
+            // Essayer avec le ClassLoader
+            try {
+                InputStream is = getClass().getClassLoader().getResourceAsStream(p.startsWith("/") ? p.substring(1) : p);
+                if (is != null) {
+                    return ImageIO.read(is);
+                }
+            } catch (IOException e) {
+                // Continuer
+            }
         }
         return null;
     }
@@ -135,111 +134,57 @@ public class AssetManager {
     /**
      * Charge depuis le système de fichiers.
      */
-    private BufferedImage loadFromFileSystem(String path) {
-        // Nettoyer le chemin
-        String cleanPath = path.startsWith("/") ? path.substring(1) : path;
-
-        // Chemins à tester
-        String[] pathsToTry = {
-                basePath + "/" + cleanPath,
-                basePath + "/environment/" + cleanPath,
-                "oikos-game/resources/" + cleanPath,
-                "oikos-game/resources/environment/" + cleanPath,
-                "resources/" + cleanPath,
-                "resources/environment/" + cleanPath
-        };
-
-        for (String fullPath : pathsToTry) {
-            File file = new File(fullPath);
-            if (file.exists() && file.isFile()) {
-                try {
-                    if (debugMode) {
-                        System.out.println("[AssetManager] Trouvé dans fichiers : " + fullPath);
-                    }
-                    return ImageIO.read(file);
-                } catch (IOException e) {
-                    // Continuer avec le prochain chemin
-                }
+    private BufferedImage loadFromFile(String path) {
+        File file = new File(path);
+        if (file.exists() && file.isFile()) {
+            try {
+                return ImageIO.read(file);
+            } catch (IOException e) {
+                return null;
             }
         }
-
         return null;
     }
 
-    /**
-     * Essaie différentes variantes du chemin.
-     */
-    private BufferedImage loadWithPathVariants(String path) {
-        // Extraire le nom du fichier
-        String fileName = path;
-        if (path.contains("/")) {
-            fileName = path.substring(path.lastIndexOf("/") + 1);
-        }
-
-        // Dossiers où chercher
-        String[] folders = {
-                "oikos-game/resources/environment/decors/jour",
-                "oikos-game/resources/environment/decors/nuit",
-                "oikos-game/resources/environment/decors/jour/eau",
-                "oikos-game/resources/environment/decors/jour/hauteur",
-                "oikos-game/resources/environment/decors/nuit/eau",
-                "oikos-game/resources/environment/decors/nuit/hauteur",
-                "oikos-game/resources/characters",
-                "resources/environment/decors/jour",
-                "resources/environment/decors/nuit"
-        };
-
-        for (String folder : folders) {
-            File file = new File(folder + "/" + fileName);
-            if (file.exists()) {
-                try {
-                    if (debugMode) {
-                        System.out.println("[AssetManager] Trouvé avec recherche : " + file.getPath());
-                    }
-                    return ImageIO.read(file);
-                } catch (IOException e) {
-                    // Continuer
-                }
-            }
-        }
-
-        return null;
-    }
-
-    /**
-     * Charge une image sans collision (raccourci).
-     */
     public Sprite loadSprite(String key, String path) {
         return loadSprite(key, path, false);
     }
 
-    /**
-     * Récupère un sprite déjà chargé.
-     */
     public Sprite getSprite(String key) {
         return spriteCache.get(key);
     }
 
-    /**
-     * Vérifie si un sprite existe dans le cache.
-     */
     public boolean hasSprite(String key) {
         return spriteCache.containsKey(key);
     }
 
+    public int size() {
+        return spriteCache.size();
+    }
+
+    public void clear() {
+        spriteCache.clear();
+    }
+
+    public void setDebugMode(boolean debug) {
+        this.debugMode = debug;
+    }
+
     /**
-     * Charge un spritesheet et le découpe en plusieurs sprites.
+     * Charge un spritesheet et le découpe.
      */
     public void loadSpritesheet(String baseName, String path, int frameWidth, int frameHeight, int count) {
         BufferedImage sheet = null;
 
-        // Essayer les différentes méthodes de chargement
+        // Essayer classpath
         sheet = loadFromClasspath(path);
+
+        // Essayer fichiers
         if (sheet == null) {
-            sheet = loadFromFileSystem(path);
-        }
-        if (sheet == null) {
-            sheet = loadWithPathVariants(path);
+            for (String basePath : BASE_PATHS) {
+                sheet = loadFromFile(basePath + path);
+                if (sheet != null) break;
+            }
         }
 
         if (sheet == null) {
@@ -258,53 +203,28 @@ public class AssetManager {
             spriteCache.put(key, new Sprite(frame, key, false));
         }
 
-        System.out.println("[AssetManager] Spritesheet chargé : " + baseName + " (" + count + " frames)");
+        System.out.println("[AssetManager] Spritesheet : " + baseName + " (" + count + " frames)");
     }
 
     /**
-     * Vide le cache.
-     */
-    public void clear() {
-        spriteCache.clear();
-        System.out.println("[AssetManager] Cache vidé.");
-    }
-
-    /**
-     * Retourne le nombre d'assets chargés.
-     */
-    public int size() {
-        return spriteCache.size();
-    }
-
-    /**
-     * Active/désactive le mode debug.
-     */
-    public void setDebugMode(boolean debug) {
-        this.debugMode = debug;
-    }
-
-    /**
-     * Définit le chemin de base manuellement.
-     */
-    public void setBasePath(String path) {
-        this.basePath = path;
-        if (debugMode) {
-            System.out.println("[AssetManager] Chemin de base défini : " + basePath);
-        }
-    }
-
-    /**
-     * Liste tous les fichiers trouvés dans un dossier (debug).
+     * Liste les fichiers disponibles (debug).
      */
     public void listAvailableAssets(String folderPath) {
-        System.out.println("[AssetManager] Recherche dans : " + folderPath);
+        System.out.println("\n[AssetManager] === SCAN DES ASSETS ===");
 
-        File folder = new File(folderPath);
-        if (folder.exists() && folder.isDirectory()) {
-            listFilesRecursive(folder, "");
-        } else {
-            System.out.println("[AssetManager] Dossier introuvable : " + folderPath);
+        for (String basePath : BASE_PATHS) {
+            File folder = new File(basePath + folderPath);
+            if (folder.exists() && folder.isDirectory()) {
+                System.out.println("Trouvé : " + folder.getAbsolutePath());
+                listFilesRecursive(folder, "  ");
+                System.out.println("=================================\n");
+                return;
+            }
         }
+
+        System.out.println("Dossier non trouvé : " + folderPath);
+        System.out.println("Répertoire courant : " + new File("").getAbsolutePath());
+        System.out.println("=================================\n");
     }
 
     private void listFilesRecursive(File folder, String indent) {
@@ -314,7 +234,7 @@ public class AssetManager {
                 if (file.isDirectory()) {
                     System.out.println(indent + "📁 " + file.getName() + "/");
                     listFilesRecursive(file, indent + "  ");
-                } else if (file.getName().endsWith(".png") || file.getName().endsWith(".jpg")) {
+                } else if (file.getName().toLowerCase().endsWith(".png")) {
                     System.out.println(indent + "🖼️ " + file.getName());
                 }
             }
