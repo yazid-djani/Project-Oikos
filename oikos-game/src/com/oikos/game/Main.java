@@ -14,7 +14,7 @@ public class Main {
 
         GameLoop gamePanel = new GameLoop();
 
-        // --- NOUVEAU : On branche la première scène ---
+        // --- On branche la première scène ---
         gamePanel.currentScene = new MenuScene(gamePanel);
 
         window.add(gamePanel);
