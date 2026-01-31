@@ -5,15 +5,22 @@ import javax.swing.JPanel;
 import java.awt.*;
 
 public class GameLoop extends JPanel implements Runnable {
-    // --- PARAMÈTRES ÉCRAN (32x32) ---
-    final int originalTileSize = 32; // Tes images font 32x32 pixels
-    final int scale = 2; // On grossit x2 (32*2 = 64 pixels sur l'écran)
+    // --- PARAMÈTRES ÉCRAN (viewport) ---
+    final int originalTileSize = 32;
+    final int scale = 2;
     public final int tileSize = originalTileSize * scale; // 64x64 pixels
-    public final int maxScreenCol = 16; // 16 colonnes
-    public final int maxScreenRow = 12; // 12 lignes
-    // Résolution finale : 1024 x 768 pixels
-    public final int screenWidth = tileSize * maxScreenCol;
-    public final int screenHeight = tileSize * maxScreenRow;
+
+    // Ce qu'on AFFICHE à l'écran
+    public final int screenCols = 16;  // 16 colonnes visibles
+    public final int screenRows = 12;  // 12 lignes visibles
+    public final int screenWidth = tileSize * screenCols;   // 1024px
+    public final int screenHeight = tileSize * screenRows;  // 768px
+
+    // Taille du MONDE (map 9x plus grande : 48x36 tiles)
+    public final int worldCols = 48;  // 16 * 3
+    public final int worldRows = 36;  // 12 * 3
+    public final int worldWidth = tileSize * worldCols;    // 3072px
+    public final int worldHeight = tileSize * worldRows;   // 2304px
 
     // Système
     Thread gameThread;

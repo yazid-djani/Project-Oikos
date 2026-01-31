@@ -10,15 +10,14 @@ public class InputHandler implements KeyListener, MouseListener, MouseMotionList
 
     // On stocke l'état de toutes les touches physiques
     private boolean[] keys = new boolean[256];
+    private boolean[] keysJustPressed = new boolean[256]; // Pour détecter un appui unique
 
     // --- CONFIGURATION DES TOUCHES (MAPPING) ---
-    // Ce sont ces variables que ton Menu Paramètres modifiera plus tard.
-    // Par défaut, on met ZQSD (Code ASCII pour un clavier standard)
     public int upKey = KeyEvent.VK_Z;
     public int downKey = KeyEvent.VK_S;
     public int leftKey = KeyEvent.VK_Q;
     public int rightKey = KeyEvent.VK_D;
-    public int actionKey = KeyEvent.VK_E; // Touche pour interagir (Couper bois, etc.)
+    public int actionKey = KeyEvent.VK_E;
 
     // Souris
     public int mouseX, mouseY;
@@ -26,19 +25,45 @@ public class InputHandler implements KeyListener, MouseListener, MouseMotionList
 
     // --- MÉTHODES UTILITAIRES POUR LE JEU ---
 
-    // Vérifie l'action abstraite (ex: "Le joueur veut monter")
     public boolean isUp() { return keys[upKey]; }
     public boolean isDown() { return keys[downKey]; }
     public boolean isLeft() { return keys[leftKey]; }
     public boolean isRight() { return keys[rightKey]; }
     public boolean isAction() { return keys[actionKey]; }
 
-    // --- GESTION TECHNIQUE (NE PAS TOUCHER) ---
+    /**
+     * Vérifie si une touche est actuellement enfoncée.
+     */
+    public boolean isKeyDown(int keyCode) {
+        if (keyCode >= 0 && keyCode < keys.length) {
+            return keys[keyCode];
+        }
+        return false;
+    }
+
+    /**
+     * Vérifie si une touche vient d'être pressée (une seule fois).
+     * À appeler dans update(), se reset automatiquement.
+     */
+    public boolean isKeyPressed(int keyCode) {
+        if (keyCode >= 0 && keyCode < keysJustPressed.length) {
+            if (keysJustPressed[keyCode]) {
+                keysJustPressed[keyCode] = false; // Consomme l'événement
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // --- GESTION TECHNIQUE ---
 
     @Override
     public void keyPressed(KeyEvent e) {
         int code = e.getKeyCode();
         if (code >= 0 && code < keys.length) {
+            if (!keys[code]) { // Première pression
+                keysJustPressed[code] = true;
+            }
             keys[code] = true;
         }
     }

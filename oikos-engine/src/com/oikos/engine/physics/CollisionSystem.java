@@ -1,296 +1,114 @@
+package com.oikos.engine.physics;
 
-public class CollisionManager
-{
-    GameLoop _world;
+import com.oikos.engine.math.Vector2;
 
-    public CollisionManager ( GameLoop _world )
-    {
-        this._world = _world;
+/**
+ * Système de détection de collisions générique.
+ * Gère les collisions avec les tiles et entre GameObjects.
+ */
+public class CollisionSystem {
+
+    // Référence à la map (tableau de tiles solides)
+    private boolean[][] solidTiles;
+
+    // Taille d'une tile en pixels
+    private int tileSize;
+
+    // Dimensions de la map en tiles
+    private int mapWidth;
+    private int mapHeight;
+
+    public CollisionSystem(int tileSize) {
+        this.tileSize = tileSize;
+        this.solidTiles = null;
     }
 
-    public void verificationImage(GameObject agent)
-    {
-        //cote des zones solides (ou zones pleines) des agents
-        int coteCollisionGaucheX = agent.posx + agent.zoneSolide.x;
-        int coteCollisionDroitX = agent.posx + agent.zoneSolide.x + agent.zoneSolide.width;
-        int coteCollisionHautY = agent.posy + agent.zoneSolide.y;
-        int coteCollisionBasY = agent.posy + agent.zoneSolide.y + agent.zoneSolide.height;
+    /**
+     * Charge la carte des collisions depuis les données de la map.
+     * @param solidMap Tableau 2D : true = solide, false = traversable
+     */
+    public void loadCollisionMap(boolean[][] solidMap) {
+        this.solidTiles = solidMap;
+        this.mapWidth = solidMap.length;
+        this.mapHeight = solidMap[0].length;
+    }
 
-        //emplacement des zones dans la fenetre d'affichage
-        int emplacementColGauche = coteCollisionGaucheX / _world.sizeImage;
-        int emplacementColDroit = coteCollisionDroitX / _world.sizeImage;
-        int emplacementLigHaut = coteCollisionHautY / _world.sizeImage;
-        int emplacementLigBas = coteCollisionBasY / _world.sizeImage;
+    /**
+     * Vérifie si un déplacement est valide (pas de collision avec les tiles).
+     * @param hitbox La hitbox de l'objet
+     * @param currentPos Position actuelle
+     * @param deltaX Déplacement horizontal souhaité
+     * @param deltaY Déplacement vertical souhaité
+     * @return true si le mouvement est autorisé
+     */
+    public boolean canMove(Hitbox hitbox, Vector2 currentPos, float deltaX, float deltaY) {
+        if (solidTiles == null) return true;
 
-        // Lors du deplacement, seulement 4 orient possibles (haut, bas, gauche, droite)
-        // On verifie alors seulement les deux coins de orient en mouvement : par exemple pour le haut on verifie les deux coins de collision du haut ...
-        // On utilise alors deux variables pour nous permettre cela 
-        int imageNum1, imageNum2;
-        
-        if ( agent.posx > (agent.speed*2) && agent.posx < (_world.maxScreenCol*_world.sizeImage - (agent.speed*2)) && agent.posy > (agent.speed*2) && agent.posy < (_world.maxScreenRow*_world.sizeImage - (agent.speed*2)) )
-        {
-            switch ( agent._orient )
-            {
-                case 0: // haut
-                    emplacementLigHaut = ((coteCollisionHautY - agent.speed) / _world.sizeImage) ; //on predit la destination d'arrivé si le cas d'aller en haut est choisi
-                    imageNum1 = _world.imaM.mapImageNum[emplacementColGauche][emplacementLigHaut];
-                    imageNum2 = _world.imaM.mapImageNum[emplacementColDroit][emplacementLigHaut];
-                    if ( _world.imaM.image[imageNum1].collision == true || _world.imaM.image[imageNum2].collision == true ) //si au moin une des deux images a les collisions activer
-                        agent.collisionON = true;
+        // Position future
+        Vector2 futurePos = new Vector2(currentPos.x + deltaX, currentPos.y + deltaY);
 
-                    break;
-                case 1:	// droit
-                    emplacementColDroit = ((coteCollisionDroitX + agent.speed) / _world.sizeImage) ; //on predit la destination d'arrivé si le cas d'aller en haut est choisi
-                    imageNum1 = _world.imaM.mapImageNum[emplacementColDroit][emplacementLigHaut];
-                    imageNum2 = _world.imaM.mapImageNum[emplacementColDroit][emplacementLigBas];
+        // On vérifie les 4 coins de la hitbox future
+        float left = hitbox.getLeft(futurePos);
+        float right = hitbox.getRight(futurePos);
+        float top = hitbox.getTop(futurePos);
+        float bottom = hitbox.getBottom(futurePos);
 
-                    if ( _world.imaM.image[imageNum1].collision == true || _world.imaM.image[imageNum2].collision == true ) //si au moin une des deux images a les collisions activer
-                        agent.collisionON = true;
-                        
-                    break;
-                case 2:	// bas
-                    emplacementLigBas = ((coteCollisionBasY + agent.speed) / _world.sizeImage) ; //on predit la destination d'arrivé si le cas d'aller en haut est choisi
-                    imageNum1 = _world.imaM.mapImageNum[emplacementColGauche][emplacementLigBas];
-                    imageNum2 = _world.imaM.mapImageNum[emplacementColDroit][emplacementLigBas];
+        // Vérifier chaque coin
+        if (isTileSolid(left, top)) return false;
+        if (isTileSolid(right - 1, top)) return false;
+        if (isTileSolid(left, bottom - 1)) return false;
+        if (isTileSolid(right - 1, bottom - 1)) return false;
 
-                    if ( _world.imaM.image[imageNum1].collision == true || _world.imaM.image[imageNum2].collision == true ) //si au moin une des deux images a les collisions activer
-                        agent.collisionON = true;
+        return true;
+    }
 
-                    break;
-                case 3:	// gauche
-                    emplacementColGauche = ((coteCollisionHautY - agent.speed ) / _world.sizeImage); //on predit la destination d'arrivé si le cas d'aller en haut est choisi
-                    imageNum1 = _world.imaM.mapImageNum[emplacementColGauche][emplacementLigHaut];
-                    imageNum2 = _world.imaM.mapImageNum[emplacementColGauche][emplacementLigBas];
+    /**
+     * Vérifie si on peut bouger horizontalement.
+     */
+    public boolean canMoveX(Hitbox hitbox, Vector2 currentPos, float deltaX) {
+        return canMove(hitbox, currentPos, deltaX, 0);
+    }
 
-                    if ( _world.imaM.image[imageNum1].collision == true || _world.imaM.image[imageNum2].collision == true ) //si au moin une des deux images a les collisions activer
-                        agent.collisionON = true;
+    /**
+     * Vérifie si on peut bouger verticalement.
+     */
+    public boolean canMoveY(Hitbox hitbox, Vector2 currentPos, float deltaY) {
+        return canMove(hitbox, currentPos, 0, deltaY);
+    }
 
-                    break;
-            }
+    /**
+     * Vérifie si une position (en pixels) est sur une tile solide.
+     */
+    public boolean isTileSolid(float pixelX, float pixelY) {
+        int tileX = (int) (pixelX / tileSize);
+        int tileY = (int) (pixelY / tileSize);
+
+        // Hors limites = solide (on ne peut pas sortir de la map)
+        if (tileX < 0 || tileX >= mapWidth || tileY < 0 || tileY >= mapHeight) {
+            return true;
         }
-        else if ( agent.posx > (agent.speed*2) && agent.posx < (_world.maxScreenCol*_world.sizeImage - (agent.speed*2)) && agent.posy >= (_world.maxScreenRow*_world.sizeImage - (agent.speed*2)) )
-        {
-            switch ( agent._orient )
-            {
-                case 0: // haut
-                    emplacementLigHaut = ((coteCollisionHautY - agent.speed) / _world.sizeImage) ; //on predit la destination d'arrivé si le cas d'aller en haut est choisi
-                    imageNum1 = _world.imaM.mapImageNum[emplacementColGauche][emplacementLigHaut];
-                    imageNum2 = _world.imaM.mapImageNum[emplacementColDroit][emplacementLigHaut];
-                    if ( _world.imaM.image[imageNum1].collision == true || _world.imaM.image[imageNum2].collision == true ) //si au moin une des deux images a les collisions activer
-                        agent.collisionON = true;
 
-                    break;
-                case 1:	// droit
-                    emplacementColDroit = ((coteCollisionDroitX + agent.speed) / _world.sizeImage) ; //on predit la destination d'arrivé si le cas d'aller en haut est choisi
-                    imageNum1 = _world.imaM.mapImageNum[emplacementColDroit][emplacementLigHaut];
-                    imageNum2 = _world.imaM.mapImageNum[emplacementColDroit][emplacementLigBas];
+        return solidTiles[tileX][tileY];
+    }
 
-                    if ( _world.imaM.image[imageNum1].collision == true || _world.imaM.image[imageNum2].collision == true ) //si au moin une des deux images a les collisions activer
-                        agent.collisionON = true;
-                        
-                    break;
-                case 3:	// gauche
-                    emplacementColGauche = ((coteCollisionHautY - agent.speed ) / _world.sizeImage); //on predit la destination d'arrivé si le cas d'aller en haut est choisi
-                    imageNum1 = _world.imaM.mapImageNum[emplacementColGauche][emplacementLigHaut];
-                    imageNum2 = _world.imaM.mapImageNum[emplacementColGauche][emplacementLigBas];
+    /**
+     * Vérifie la collision entre deux hitbox.
+     */
+    public boolean checkCollision(Hitbox a, Vector2 posA, Hitbox b, Vector2 posB) {
+        return a.intersects(b, posA, posB);
+    }
 
-                    if ( _world.imaM.image[imageNum1].collision == true || _world.imaM.image[imageNum2].collision == true ) //si au moin une des deux images a les collisions activer
-                        agent.collisionON = true;
+    /**
+     * Retourne la tile à une position donnée.
+     */
+    public int getTileAt(float pixelX, float pixelY) {
+        int tileX = (int) (pixelX / tileSize);
+        int tileY = (int) (pixelY / tileSize);
 
-                    break;
-            }
+        if (tileX < 0 || tileX >= mapWidth || tileY < 0 || tileY >= mapHeight) {
+            return -1;
         }
-        else if ( agent.posx <= (agent.speed*2) && agent.posy > (agent.speed*2) && agent.posy < (_world.maxScreenRow*_world.sizeImage - (agent.speed*2)) )
-        {
-            switch ( agent._orient )
-            {
-                case 0: // haut
-                    emplacementLigHaut = ((coteCollisionHautY - agent.speed) / _world.sizeImage) ; //on predit la destination d'arrivé si le cas d'aller en haut est choisi
-                    imageNum1 = _world.imaM.mapImageNum[emplacementColGauche][emplacementLigHaut];
-                    imageNum2 = _world.imaM.mapImageNum[emplacementColDroit][emplacementLigHaut];
-                    if ( _world.imaM.image[imageNum1].collision == true || _world.imaM.image[imageNum2].collision == true ) //si au moin une des deux images a les collisions activer
-                        agent.collisionON = true;
 
-                    break;
-                case 1:	// droit
-                    emplacementColDroit = ((coteCollisionDroitX + agent.speed) / _world.sizeImage) ; //on predit la destination d'arrivé si le cas d'aller en haut est choisi
-                    imageNum1 = _world.imaM.mapImageNum[emplacementColDroit][emplacementLigHaut];
-                    imageNum2 = _world.imaM.mapImageNum[emplacementColDroit][emplacementLigBas];
-
-                    if ( _world.imaM.image[imageNum1].collision == true || _world.imaM.image[imageNum2].collision == true ) //si au moin une des deux images a les collisions activer
-                        agent.collisionON = true;
-                        
-                    break;
-                case 2:	// bas
-                    emplacementLigBas = ((coteCollisionBasY + agent.speed) / _world.sizeImage) ; //on predit la destination d'arrivé si le cas d'aller en haut est choisi
-                    imageNum1 = _world.imaM.mapImageNum[emplacementColGauche][emplacementLigBas];
-                    imageNum2 = _world.imaM.mapImageNum[emplacementColDroit][emplacementLigBas];
-
-                    if ( _world.imaM.image[imageNum1].collision == true || _world.imaM.image[imageNum2].collision == true ) //si au moin une des deux images a les collisions activer
-                        agent.collisionON = true;
-
-                    break;
-            }
-        }
-        else if ( agent.posx <= (_world.maxScreenCol*_world.sizeImage - (agent.speed*2)) && agent.posy > (agent.speed*2) && agent.posy < (_world.maxScreenRow*_world.sizeImage - (agent.speed*2)) )
-        {
-            switch ( agent._orient )
-            {
-                case 0: // haut
-                    emplacementLigHaut = ((coteCollisionHautY - agent.speed) / _world.sizeImage) ; //on predit la destination d'arrivé si le cas d'aller en haut est choisi
-                    imageNum1 = _world.imaM.mapImageNum[emplacementColGauche][emplacementLigHaut];
-                    imageNum2 = _world.imaM.mapImageNum[emplacementColDroit][emplacementLigHaut];
-                    if ( _world.imaM.image[imageNum1].collision == true || _world.imaM.image[imageNum2].collision == true ) //si au moin une des deux images a les collisions activer
-                        agent.collisionON = true;
-
-                    break;
-                case 2:	// bas
-                    emplacementLigBas = ((coteCollisionBasY + agent.speed) / _world.sizeImage) ; //on predit la destination d'arrivé si le cas d'aller en haut est choisi
-                    imageNum1 = _world.imaM.mapImageNum[emplacementColGauche][emplacementLigBas];
-                    imageNum2 = _world.imaM.mapImageNum[emplacementColDroit][emplacementLigBas];
-
-                    if ( _world.imaM.image[imageNum1].collision == true || _world.imaM.image[imageNum2].collision == true ) //si au moin une des deux images a les collisions activer
-                        agent.collisionON = true;
-
-                    break;
-                case 3:	// gauche
-                    emplacementColGauche = ((coteCollisionHautY - agent.speed ) / _world.sizeImage); //on predit la destination d'arrivé si le cas d'aller en haut est choisi
-                    imageNum1 = _world.imaM.mapImageNum[emplacementColGauche][emplacementLigHaut];
-                    imageNum2 = _world.imaM.mapImageNum[emplacementColGauche][emplacementLigBas];
-
-                    if ( _world.imaM.image[imageNum1].collision == true || _world.imaM.image[imageNum2].collision == true ) //si au moin une des deux images a les collisions activer
-                        agent.collisionON = true;
-
-                    break;
-            }
-        }
-        else if ( agent.posx > (agent.speed*2) && agent.posx < (_world.maxScreenCol*_world.sizeImage - (agent.speed*2)) && agent.posy <= (agent.speed*2))
-        {
-            switch ( agent._orient )
-            {
-                case 1:	// droit
-                    emplacementColDroit = ((coteCollisionDroitX + agent.speed) / _world.sizeImage) ; //on predit la destination d'arrivé si le cas d'aller en haut est choisi
-                    imageNum1 = _world.imaM.mapImageNum[emplacementColDroit][emplacementLigHaut];
-                    imageNum2 = _world.imaM.mapImageNum[emplacementColDroit][emplacementLigBas];
-
-                    if ( _world.imaM.image[imageNum1].collision == true || _world.imaM.image[imageNum2].collision == true ) //si au moin une des deux images a les collisions activer
-                        agent.collisionON = true;
-                        
-                    break;
-                case 2:	// bas
-                    emplacementLigBas = ((coteCollisionBasY + agent.speed) / _world.sizeImage) ; //on predit la destination d'arrivé si le cas d'aller en haut est choisi
-                    imageNum1 = _world.imaM.mapImageNum[emplacementColGauche][emplacementLigBas];
-                    imageNum2 = _world.imaM.mapImageNum[emplacementColDroit][emplacementLigBas];
-
-                    if ( _world.imaM.image[imageNum1].collision == true || _world.imaM.image[imageNum2].collision == true ) //si au moin une des deux images a les collisions activer
-                        agent.collisionON = true;
-
-                    break;
-                case 3:	// gauche
-                    emplacementColGauche = ((coteCollisionHautY - agent.speed ) / _world.sizeImage); //on predit la destination d'arrivé si le cas d'aller en haut est choisi
-                    imageNum1 = _world.imaM.mapImageNum[emplacementColGauche][emplacementLigHaut];
-                    imageNum2 = _world.imaM.mapImageNum[emplacementColGauche][emplacementLigBas];
-
-                    if ( _world.imaM.image[imageNum1].collision == true || _world.imaM.image[imageNum2].collision == true ) //si au moin une des deux images a les collisions activer
-                        agent.collisionON = true;
-
-                    break;
-            }
-        }
-        else if ( agent.posx <= (agent.speed*2) && agent.posy <= (agent.speed*2))
-        {
-            switch ( agent._orient )
-            {
-                case 1:	// droit
-                    emplacementColDroit = ((coteCollisionDroitX + agent.speed) / _world.sizeImage) ; //on predit la destination d'arrivé si le cas d'aller en haut est choisi
-                    imageNum1 = _world.imaM.mapImageNum[emplacementColDroit][emplacementLigHaut];
-                    imageNum2 = _world.imaM.mapImageNum[emplacementColDroit][emplacementLigBas];
-
-                    if ( _world.imaM.image[imageNum1].collision == true || _world.imaM.image[imageNum2].collision == true ) //si au moin une des deux images a les collisions activer
-                        agent.collisionON = true;
-                        
-                    break;
-                case 2:	// bas
-                    emplacementLigBas = ((coteCollisionBasY + agent.speed) / _world.sizeImage) ; //on predit la destination d'arrivé si le cas d'aller en haut est choisi
-                    imageNum1 = _world.imaM.mapImageNum[emplacementColGauche][emplacementLigBas];
-                    imageNum2 = _world.imaM.mapImageNum[emplacementColDroit][emplacementLigBas];
-
-                    if ( _world.imaM.image[imageNum1].collision == true || _world.imaM.image[imageNum2].collision == true ) //si au moin une des deux images a les collisions activer
-                        agent.collisionON = true;
-
-                    break;
-            }
-        }
-        else if ( agent.posx >= (_world.maxScreenCol*_world.sizeImage - (agent.speed*2)) && agent.posy <= (agent.speed*2))
-        {
-            switch ( agent._orient )
-            {
-                case 2:	// bas
-                    emplacementLigBas = ((coteCollisionBasY + agent.speed) / _world.sizeImage) ; //on predit la destination d'arrivé si le cas d'aller en haut est choisi
-                    imageNum1 = _world.imaM.mapImageNum[emplacementColGauche][emplacementLigBas];
-                    imageNum2 = _world.imaM.mapImageNum[emplacementColDroit][emplacementLigBas];
-
-                    if ( _world.imaM.image[imageNum1].collision == true || _world.imaM.image[imageNum2].collision == true ) //si au moin une des deux images a les collisions activer
-                        agent.collisionON = true;
-
-                    break;
-                case 3:	// gauche
-                    emplacementColGauche = ((coteCollisionHautY - agent.speed ) / _world.sizeImage); //on predit la destination d'arrivé si le cas d'aller en haut est choisi
-                    imageNum1 = _world.imaM.mapImageNum[emplacementColGauche][emplacementLigHaut];
-                    imageNum2 = _world.imaM.mapImageNum[emplacementColGauche][emplacementLigBas];
-
-                    if ( _world.imaM.image[imageNum1].collision == true || _world.imaM.image[imageNum2].collision == true ) //si au moin une des deux images a les collisions activer
-                        agent.collisionON = true;
-
-                    break;
-            }
-        }
-        else if ( agent.posx == (agent.speed*2) && agent.posy == (_world.maxScreenRow*_world.sizeImage - (agent.speed*2)) )
-        {
-            switch ( agent._orient )
-            {
-                case 0: // haut
-                    emplacementLigHaut = ((coteCollisionHautY - agent.speed) / _world.sizeImage) ; //on predit la destination d'arrivé si le cas d'aller en haut est choisi
-                    imageNum1 = _world.imaM.mapImageNum[emplacementColGauche][emplacementLigHaut];
-                    imageNum2 = _world.imaM.mapImageNum[emplacementColDroit][emplacementLigHaut];
-                    if ( _world.imaM.image[imageNum1].collision == true || _world.imaM.image[imageNum2].collision == true ) //si au moin une des deux images a les collisions activer
-                        agent.collisionON = true;
-
-                    break;
-                case 1:	// droit
-                    emplacementColDroit = ((coteCollisionDroitX + agent.speed) / _world.sizeImage) ; //on predit la destination d'arrivé si le cas d'aller en haut est choisi
-                    imageNum1 = _world.imaM.mapImageNum[emplacementColDroit][emplacementLigHaut];
-                    imageNum2 = _world.imaM.mapImageNum[emplacementColDroit][emplacementLigBas];
-
-                    if ( _world.imaM.image[imageNum1].collision == true || _world.imaM.image[imageNum2].collision == true ) //si au moin une des deux images a les collisions activer
-                        agent.collisionON = true;
-                        
-                    break;
-            }
-        }
-        else if ( agent.posx >= (_world.maxScreenCol*_world.sizeImage - (agent.speed*2)) && agent.posy >= (_world.maxScreenRow*_world.sizeImage - (agent.speed*2)) )
-        {
-            switch ( agent._orient )
-            {
-                case 0: // haut
-                    emplacementLigHaut = ((coteCollisionHautY - agent.speed) / _world.sizeImage) ; //on predit la destination d'arrivé si le cas d'aller en haut est choisi
-                    imageNum1 = _world.imaM.mapImageNum[emplacementColGauche][emplacementLigHaut];
-                    imageNum2 = _world.imaM.mapImageNum[emplacementColDroit][emplacementLigHaut];
-                    if ( _world.imaM.image[imageNum1].collision == true || _world.imaM.image[imageNum2].collision == true ) //si au moin une des deux images a les collisions activer
-                        agent.collisionON = true;
-
-                    break;
-                case 3:	// gauche
-                    emplacementColGauche = ((coteCollisionHautY - agent.speed ) / _world.sizeImage); //on predit la destination d'arrivé si le cas d'aller en haut est choisi
-                    imageNum1 = _world.imaM.mapImageNum[emplacementColGauche][emplacementLigHaut];
-                    imageNum2 = _world.imaM.mapImageNum[emplacementColGauche][emplacementLigBas];
-
-                    if ( _world.imaM.image[imageNum1].collision == true || _world.imaM.image[imageNum2].collision == true ) //si au moin une des deux images a les collisions activer
-                        agent.collisionON = true;
-
-                    break;
-            }
-        }
-        
+        return solidTiles[tileX][tileY] ? 1 : 0;
     }
 }
