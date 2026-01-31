@@ -32,19 +32,19 @@ Project-Oikos/
 │       └── input/
 │           └── InputHandler.java   # Les Commandes : Écoute le clavier (Z,Q,S,D) et la souris.
 │
-└── oikos-game/            # [MODULE JEU] : Ton contenu spécifique (L'histoire, les persos)
-├── resources/         # Tes fichiers bruts
-│   ├── characters/    # Images des PNJ/Animaux (wolf.png, villager.png...)
-│   └── environment/   # Images des décors (tree.png, grass.png...)
+└── oikos-game/            # [MODULE JEU] 
+├── resources/         # Fichiers bruts
+│   ├── characters/    # Images des PNJ/Animaux 
+│   └── environment/   # Images des décors 
 │
 └── src/com/oikos/game/
 ├── Main.java              # Le Démarreur : Contient "public static void main". Lance la fenêtre.
 │
-├── entities/              # Tes Créatures (Héritent de GameObject)
+├── entities/              # Les Créatures (Héritent de GameObject)
 │   ├── Wolf.java          # Logique du loup (chasser, manger).
 │   ├── Sheep.java         # Logique du mouton (fuir, brouter).
 │   ├── Villager.java      # Logique des humains génériques.
-│   └── Lumberjack.java    # Spécifique : Coupe du bois (ex-Bucheron).
+│   └── Lumberjack.java    # Spécifique Lumberjack : Coupe du bois.
 │
 ├── items/                 # Tes Objets
 │   └── Item.java          # (ex-Objet.java)

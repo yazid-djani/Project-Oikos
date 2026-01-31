@@ -8,7 +8,7 @@ public class CollisionManager
         this._world = _world;
     }
 
-    public void verificationImage(Agent agent)
+    public void verificationImage(GameObject agent)
     {
         //cote des zones solides (ou zones pleines) des agents
         int coteCollisionGaucheX = agent.posx + agent.zoneSolide.x;

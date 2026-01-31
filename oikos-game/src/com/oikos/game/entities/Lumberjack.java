@@ -3,11 +3,8 @@ import java.awt.Image;
 import javax.imageio.ImageIO;
 import java.io.File;
 import java.util.ArrayList;
-import java.util.List;
-import java.util.List;
-import java.math.*;
 
-public class Bucheron extends Villageois 
+public class Lumberjack extends Villageois
 {
     int     etape;              //reussir de couper l'arbre etape chercher/couper/finir 0 1 2
     int     indice_path = 0;    //indice de l'element dans le path pour Astar
@@ -20,7 +17,7 @@ public class Bucheron extends Villageois
     Image   bucheron_dos_mov1, bucheron_dos_mov2;
     Image   bucheron_face_mov1, bucheron_face_mov2;
 
-    public Bucheron( MinecosysPanel _world ) 
+    public Lumberjack(MinecosysPanel _world )
     {
         super(_world);
         this.age  = (int)(Math.random()*(25 - 18 + 1) + 18);
@@ -32,7 +29,7 @@ public class Bucheron extends Villageois
         bucheronImage();
     }
 
-    public Bucheron( MinecosysPanel _world, int posx, int posy , int age) 
+    public Lumberjack(MinecosysPanel _world, int posx, int posy , int age)
     {
         super(_world);
         this.posx = posx;
