@@ -1,23 +1,16 @@
 package com.oikos.engine.core;
 
 import com.oikos.engine.input.InputHandler;
-
 import javax.swing.JPanel;
-import java.awt.Color;
-import java.awt.Dimension;
-import java.awt.Graphics;
-import java.awt.Graphics2D;
+import java.awt.*;
 
 public class GameLoop extends JPanel implements Runnable {
-
-    // --- PARAMÈTRES ÉCRAN (Modifiés pour 32x32) ---
+    // --- PARAMÈTRES ÉCRAN (32x32) ---
     final int originalTileSize = 32; // Tes images font 32x32 pixels
     final int scale = 2; // On grossit x2 (32*2 = 64 pixels sur l'écran)
-
     public final int tileSize = originalTileSize * scale; // 64x64 pixels
     public final int maxScreenCol = 16; // 16 colonnes
     public final int maxScreenRow = 12; // 12 lignes
-
     // Résolution finale : 1024 x 768 pixels
     public final int screenWidth = tileSize * maxScreenCol;
     public final int screenHeight = tileSize * maxScreenRow;
@@ -26,6 +19,9 @@ public class GameLoop extends JPanel implements Runnable {
     Thread gameThread;
     public InputHandler inputH = new InputHandler();
 
+    // --- SCÈNE ACTIVE ---
+    public Scene currentScene;
+
     // FPS
     int FPS = 60;
 
@@ -33,7 +29,6 @@ public class GameLoop extends JPanel implements Runnable {
         this.setPreferredSize(new Dimension(screenWidth, screenHeight));
         this.setBackground(Color.black); // Fond noir par défaut
         this.setDoubleBuffered(true);
-
         // Connexion des contrôles
         this.addKeyListener(inputH);
         this.addMouseListener(inputH);
@@ -75,10 +70,14 @@ public class GameLoop extends JPanel implements Runnable {
         super.paintComponent(g);
         Graphics2D g2 = (Graphics2D) g;
 
-        // Code temporaire pour vérifier que la résolution marche
-        g2.setColor(Color.WHITE);
-        g2.drawString("Oikos Engine - 32px Mode", 10, 20);
-        g2.drawRect(100, 100, tileSize, tileSize); // Dessine un carré de la taille d'une tuile (64x64)
+        // On dessine la scène active
+        if (currentScene != null) {
+            currentScene.draw(g2);
+        } else {
+            // Si aucune scène n'est chargée (écran noir de chargement)
+            g2.setColor(Color.WHITE);
+            g2.drawString("Loading...", 100, 100);
+        }
 
         g2.dispose();
     }

@@ -1,33 +1,27 @@
+package com.oikos.game;
+
+import com.oikos.engine.core.GameLoop;
+import com.oikos.game.scenes.MenuScene; // Importe ton menu
+
 import javax.swing.JFrame;
 
-public class main
-{
-    public static void main (String[] args)
-    {
-        // ===== | affichage de la fenetre graphique | =====
-		JFrame frame = new JFrame("Minecosys");
-		frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        frame.setResizable(false);
+public class Main {
+    public static void main(String[] args) {
+        JFrame window = new JFrame();
+        window.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        window.setResizable(false);
+        window.setTitle("Project Oikos");
 
-        GameLoop minecosys = new GameLoop();
-        
-        System.out.println(minecosys.imaM.mapImageNum.length);
-        System.out.println(minecosys.imaM.mapImageNum[0].length);
-        for(int j=0;j<minecosys.imaM.mapImageNum[0].length-1;j++){
-            System.out.print("{");
-        for(int i=0;i<minecosys.imaM.mapImageNum.length-1;i++){
-                System.out.print(minecosys.imaM.mapImageNum[i][j]+",");
-            }
-            System.out.print("},");
-            System.out.println();
-        }
-        
-        frame.add(minecosys);
-        frame.pack();
-		frame.setLocationRelativeTo(null);
-		frame.setVisible(true);
+        GameLoop gamePanel = new GameLoop();
 
-        minecosys.startAnimation();
-        
+        // --- NOUVEAU : On branche la première scène ---
+        gamePanel.currentScene = new MenuScene(gamePanel);
+
+        window.add(gamePanel);
+        window.pack();
+        window.setLocationRelativeTo(null);
+        window.setVisible(true);
+
+        gamePanel.startGameThread();
     }
 }
